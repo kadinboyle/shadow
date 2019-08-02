@@ -4,8 +4,9 @@
 #include "easylogging++.h"
 #include <iostream>
 
-INITIALIZE_EASYLOGGINGPP
+#include "ServerSocket.h"
 
+INITIALIZE_EASYLOGGINGPP
 
 
 void configureLogger() {
@@ -19,6 +20,10 @@ void configureLogger() {
 int main()
 {
 	configureLogger();
-    std::cout << "Hello World!\n";
 	LOG(INFO) << "GIDDAY";
+
+	ServerSocket server;
+	server.Listen();
+	server.Stop();
+	std::cin.get();
 }

@@ -63,5 +63,3 @@ static inline std::string trim_copy(std::string s) {
 }
 
 std::string inet4_ntop_str(sockaddr_in const* addrStruct);
-std::string inet6_ntop_str(sockaddr_in6 const* addrStruct);
-std::string inet_ntop_str(struct sockaddr* addrStruct);

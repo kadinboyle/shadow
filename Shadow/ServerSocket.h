@@ -9,6 +9,7 @@
 #include <string>
 #include <exception>
 #include <vector>
+#include <memory>
 
 #include "Client.h"
 
@@ -26,11 +27,12 @@ class ServerSocket
 
 		FD_SET readDescriptors;
 		SOCKET maxFD = INVALID_SOCKET;
-		std::vector<Client> mConnectedClients;
+		std::vector<std::unique_ptr<Client>> mConnectedClients;
 
 		void ZeroClientSockets();
 		void CheckForConnections();
 		void AcceptNewClient();
+		void TerminateClient(std::unique_ptr<Client> const &client);
 		int Select();
 
 };

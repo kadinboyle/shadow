@@ -83,7 +83,7 @@ void ServerSocket::Listen(){
 		activity = Select();
 		if (activity < 0) {
 			LOG(ERROR) << "select() error: " << GetWSAErrorString();
-			continue;
+			mDoListen = false;
 		}
 			
 		//check for new connections
@@ -108,11 +108,11 @@ void ServerSocket::ZeroClientSockets() {
 	maxFD = mListenSocket;
 
 	for (auto& client : mConnectedClients) {
-		if (client.socket > 0)
-			FD_SET(client.socket, &readDescriptors);
+		if (client->socket > 0)
+			FD_SET(client->socket, &readDescriptors);
 
-		if (client.socket > maxFD)
-			maxFD = client.socket;
+		if (client->socket > maxFD)
+			maxFD = client->socket;
 	}
 }
 
@@ -126,13 +126,29 @@ void ServerSocket::CheckForConnections(){
 	}
 }
 
+void ServerSocket::TerminateClient(std::unique_ptr<Client> const &client) {
+	if (client->IsTerminated())
+		return;
+	LOG(INFO) << "Terminating Client " << client->GetID();
+
+	FD_CLR(client->socket, &readDescriptors);
+
+	std::vector<std::unique_ptr<Client>>::iterator it = std::find(mConnectedClients.begin(), mConnectedClients.end(), client);
+	if (it != mConnectedClients.end())
+		mConnectedClients.erase(it); //erasing will trigger clients Destructor and Terminate method which will closesocket
+	else
+		LOG(WARNING) << "Client not found in list";
+}
+
 void ServerSocket::AcceptNewClient(){
-	Client client;
+	std::unique_ptr<Client> client(new Client);
 	u_long nonBlockingEnable = 1;
-	
-	int newConnection = accept(mListenSocket, (struct sockaddr*) & client.endpoint, &client.saddr_len);
-	if (newConnection < 1) {
+
+
+	SOCKET newConnection = accept(mListenSocket, (struct sockaddr*) & client->endpoint, &client->saddr_len);
+	if (newConnection == INVALID_SOCKET) {
 		LOG(ERROR) << "Failed to accept client connection";
+		closesocket(newConnection);
 		return;
 	}
 
@@ -141,15 +157,14 @@ void ServerSocket::AcceptNewClient(){
 		LOG(ERROR) << "ioctlsocket() set non blocking on incoming client failed: " << GetWSAErrorString();
 		return;
 	}
-	
-	client.socket = newConnection;
-	mConnectedClients.push_back(client);
+
+	client->socket = newConnection;
 
 	char port[6] = { 0 };
-	int nw = snprintf(port, 6, "%u", ntohs(client.endpoint.sin_port));
-	LOG(INFO) << "Connection accepted from " << inet4_ntop_str(&client.endpoint) << ":" << port;
+	int nw = snprintf(port, 6, "%u", ntohs(client->endpoint.sin_port));
+	LOG(INFO) << "Connection accepted from " << inet4_ntop_str(&client->endpoint) << ":" << port;
 
-	closesocket(client.socket);
-	LOG(INFO) << "Terminated client";
+	mConnectedClients.push_back(std::move(client));
 
+	TerminateClient(mConnectedClients.at(0));
 }

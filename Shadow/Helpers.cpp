@@ -16,18 +16,3 @@ std::string inet4_ntop_str(sockaddr_in const* addrStruct) {
 	inet_ntop(AF_INET, &(addrStruct->sin_addr), strBuf, INET_ADDRSTRLEN);
 	return std::string(strBuf);
 }
-
-std::string inet6_ntop_str(sockaddr_in6 const* addrStruct) {
-	char strBuf[INET6_ADDRSTRLEN];
-	return std::string(inet_ntop(AF_INET6, &addrStruct->sin6_addr, strBuf, INET6_ADDRSTRLEN));
-}
-
-std::string inet_ntop_str(sockaddr* addrStruct) {
-	if (addrStruct->sa_family == AF_INET) {
-		return inet4_ntop_str((sockaddr_in const*)addrStruct);
-	}
-	else if (addrStruct->sa_family == AF_INET6) {
-		return inet6_ntop_str((sockaddr_in6 const*)addrStruct);
-	}
-	return "";
-}

@@ -13,6 +13,9 @@
 
 #include "Client.h"
 
+using ClientList = std::vector<std::unique_ptr<Client>>;
+using ClientPtr = std::unique_ptr<Client>;
+
 class ServerSocket
 {
 	public: 
@@ -25,15 +28,17 @@ class ServerSocket
 		bool mDoListen = false;
 		const int mPort;
 
-		FD_SET readDescriptors;
+		FD_SET readDescriptors, exceptionDescriptors, writeDescriptors;
 		SOCKET maxFD = INVALID_SOCKET;
-		std::vector<std::unique_ptr<Client>> mConnectedClients;
+		ClientList mConnectedClients;
 
 		void ZeroClientSockets();
 		void CheckForConnections();
 		void AcceptNewClient();
-		void TerminateClient(std::unique_ptr<Client> const &client);
+		void TerminateClient(ClientPtr const &client);
+		void CheckClients();
 		int Select();
+		bool ReadData(ClientPtr const &client);
 
 };
 

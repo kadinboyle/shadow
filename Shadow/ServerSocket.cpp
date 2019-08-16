@@ -90,7 +90,7 @@ void ServerSocket::Listen(){
 		this->CheckForConnections();
 
 		//general IO
-		//this->CheckClientsForRead();
+		this->CheckClients();
 
 
 	 }
@@ -104,21 +104,85 @@ void ServerSocket::Stop(){
 
 void ServerSocket::ZeroClientSockets() {
 	FD_ZERO(&readDescriptors);
+	FD_ZERO(&writeDescriptors);
+	FD_ZERO(&exceptionDescriptors);
+
+	//add listen socket
 	FD_SET(mListenSocket, &readDescriptors);
-	maxFD = mListenSocket;
+	FD_SET(mListenSocket, &exceptionDescriptors);
 
-	for (auto& client : mConnectedClients) {
-		if (client->socket > 0)
-			FD_SET(client->socket, &readDescriptors);
-
-		if (client->socket > maxFD)
-			maxFD = client->socket;
+	for (auto client = mConnectedClients.begin(); client != mConnectedClients.end(); ++client) {
+		if ((*client)->socket != INVALID_SOCKET) {
+			FD_SET((*client)->socket, &readDescriptors);
+			FD_SET((*client)->socket, &exceptionDescriptors);
+		}
+		else {
+			LOG(ERROR) << "Invalid client socket in connected clients array, removing";
+			client = mConnectedClients.erase(client);
+		}
 	}
+
+	//for (auto& client : mConnectedClients) {
+	//	if (client->socket != INVALID_SOCKET) {
+	//		FD_SET(client->socket, &readDescriptors);
+	//		FD_SET(client->socket, &exceptionDescriptors);
+	//	}
+	//	else {
+	//		LOG(ERROR) << "Invalid client socket in connected clients array";
+	//	}
+	//}
 }
 
 int ServerSocket::Select(){
 	return select(0, &readDescriptors, NULL, NULL, NULL);
 }
+
+bool ServerSocket::ReadData(ClientPtr const &client) {
+	LOG(INFO) << "DF";
+	int bytesRead = recv(client->socket, client->recvBuffer + client->recvBufferUsed, kClientBufferSize - client->recvBufferUsed, 0);
+	LOG(INFO) << client->recvBuffer;
+
+	if (bytesRead == 0) {
+		LOG(INFO) << "Client done";
+		return false;
+	}
+	else if (bytesRead == SOCKET_ERROR) {
+		int err, errlen = sizeof(err);
+		getsockopt(client->socket, SOL_SOCKET, SO_ERROR, (char*)& err, &errlen);
+		return (err == WSAEWOULDBLOCK);
+	}
+
+	client->recvBufferUsed += bytesRead;
+
+	return true;
+}
+
+void ServerSocket::CheckClients() {
+
+	for (auto &client : mConnectedClients) {
+		bool socketOkay = true;
+		if (FD_ISSET(client->socket, &exceptionDescriptors)) {
+			LOG(WARNING) << "Client exception descriptors are set";
+		}
+		else {
+			if (FD_ISSET(client->socket, &readDescriptors)) {
+				LOG(INFO) << "Client " << client->GetID() << " has data!";
+				socketOkay = ReadData(client);
+			}
+			/*if (FD_ISSET(client->socket, &writeDescriptors)) {
+
+			}*/
+		}
+
+
+		if (!socketOkay) {
+			LOG(ERROR) << "An error occurred while checking a client socket. Client " << client->GetID() << ": " << GetWSAErrorString();
+			TerminateClient(client);
+			//is it okay to modify mConnectedClients here??
+		}
+	}
+}
+
 
 void ServerSocket::CheckForConnections(){
 	if (FD_ISSET(mListenSocket, &readDescriptors)) {
@@ -126,22 +190,24 @@ void ServerSocket::CheckForConnections(){
 	}
 }
 
-void ServerSocket::TerminateClient(std::unique_ptr<Client> const &client) {
+//TODO: Check this okay with vector removal
+void ServerSocket::TerminateClient(ClientPtr const &client) {
 	if (client->IsTerminated())
 		return;
 	LOG(INFO) << "Terminating Client " << client->GetID();
 
 	FD_CLR(client->socket, &readDescriptors);
 
-	std::vector<std::unique_ptr<Client>>::iterator it = std::find(mConnectedClients.begin(), mConnectedClients.end(), client);
+	ClientList::iterator it = std::find(mConnectedClients.begin(), mConnectedClients.end(), client);
 	if (it != mConnectedClients.end())
 		mConnectedClients.erase(it); //erasing will trigger clients Destructor and Terminate method which will closesocket
 	else
 		LOG(WARNING) << "Client not found in list";
 }
 
+
 void ServerSocket::AcceptNewClient(){
-	std::unique_ptr<Client> client(new Client);
+	ClientPtr client(new Client);
 	u_long nonBlockingEnable = 1;
 
 
@@ -166,5 +232,5 @@ void ServerSocket::AcceptNewClient(){
 
 	mConnectedClients.push_back(std::move(client));
 
-	TerminateClient(mConnectedClients.at(0));
+	//TerminateClient(mConnectedClients.at(0));
 }

@@ -8,12 +8,12 @@ const int Client::GetID() const {
 Client::Client() {
 	static int __id = 1;
 	ID = __id++;
-	LOG(INFO) << "Client " << ID << " Constructed";
+	//LOG(DEBUG) << "Client " << ID << " Constructed";
 }
 
 Client::~Client() {
 	TerminateConnection();
-	LOG(INFO) << "Client " << ID << " destructed";
+	//LOG(DEBUG) << "Client " << ID << " destructed";
 }
 
 bool Client::operator==(const Client& compareTarget) const {
@@ -26,7 +26,11 @@ void Client::TerminateConnection() {
 
 	mIsTerminated = true;
 	closesocket(socket);
-	LOG(INFO) << "Client " << ID << " socket terminated";
+}
+
+void Client::ClearBuffers() {
+	std::fill(std::begin(recvBuffer), std::end(recvBuffer), 0);
+	recvBufferUsed = 0;
 }
 
 bool Client::IsTerminated() {

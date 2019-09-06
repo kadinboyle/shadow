@@ -2,6 +2,7 @@
 #include "easylogging++.h"
 #include "Helpers.h"
 
+
 ServerSocket::ServerSocket(const std::string port) : mPort(std::stoi(port)) {
 	WSADATA wsaData;
 	int res;
@@ -113,61 +114,66 @@ void ServerSocket::ZeroClientSockets() {
 
 	for (auto client = mConnectedClients.begin(); client != mConnectedClients.end(); ++client) {
 		if ((*client)->socket != INVALID_SOCKET) {
-			FD_SET((*client)->socket, &readDescriptors);
+
+			FD_SET((*client)->socket, &readDescriptors); //check for buffer space?
 			FD_SET((*client)->socket, &exceptionDescriptors);
 		}
 		else {
-			LOG(ERROR) << "Invalid client socket in connected clients array, removing";
+			LOG(ERROR) << "Removing client";
+			//call TerminateClient instead?
 			client = mConnectedClients.erase(client);
+			if (client == mConnectedClients.end())
+				break;
 		}
 	}
-
-	//for (auto& client : mConnectedClients) {
-	//	if (client->socket != INVALID_SOCKET) {
-	//		FD_SET(client->socket, &readDescriptors);
-	//		FD_SET(client->socket, &exceptionDescriptors);
-	//	}
-	//	else {
-	//		LOG(ERROR) << "Invalid client socket in connected clients array";
-	//	}
-	//}
 }
 
 int ServerSocket::Select(){
-	return select(0, &readDescriptors, NULL, NULL, NULL);
+	return select(0, &readDescriptors, &writeDescriptors, &exceptionDescriptors, NULL);
 }
 
-bool ServerSocket::ReadData(ClientPtr const &client) {
-	LOG(INFO) << "DF";
-	int bytesRead = recv(client->socket, client->recvBuffer + client->recvBufferUsed, kClientBufferSize - client->recvBufferUsed, 0);
-	LOG(INFO) << client->recvBuffer;
+int ServerSocket::ReadData(ClientPtr const &client) {
+	int err;
 
-	if (bytesRead == 0) {
-		LOG(INFO) << "Client done";
-		return false;
-	}
-	else if (bytesRead == SOCKET_ERROR) {
-		int err, errlen = sizeof(err);
-		getsockopt(client->socket, SOL_SOCKET, SO_ERROR, (char*)& err, &errlen);
-		return (err == WSAEWOULDBLOCK);
-	}
+	while (client->recvBufferUsed < kClientBufferSize) {
+		int bytesRead = recv(client->socket, client->recvBuffer + client->recvBufferUsed, kClientBufferSize - client->recvBufferUsed, 0);
+		
+		if (bytesRead == 0) {
+			LOG(INFO) << "Socket closed by client?";
+			return WSAECONNRESET; //is this case ever hit in nonblocking socket? Maybe remove
+		}
+		else if (bytesRead == SOCKET_ERROR) {
+			err = WSAGetLastError();
 
-	client->recvBufferUsed += bytesRead;
+			if (err == WSAEWOULDBLOCK) {
+				return SOCKET_OKAY; //fine, as using nonblocking socket
+			}
+			
+			return err;
+		}
 
-	return true;
+		client->recvBufferUsed += bytesRead;
+
+	} 
+	//DONT FORGET TO CLEAR VARIABLES ONCE BUFFER DATA EXTRACTED
+
+	return SOCKET_OKAY;
 }
 
 void ServerSocket::CheckClients() {
 
 	for (auto &client : mConnectedClients) {
-		bool socketOkay = true;
+		int socketStatus = SOCKET_OKAY;
+
 		if (FD_ISSET(client->socket, &exceptionDescriptors)) {
-			LOG(WARNING) << "Client exception descriptors are set";
+			LOG(WARNING) << "Client " << client->socket << " exception descriptor set";
+			socketStatus = SOCKET_ERROR;
+			FD_CLR(client->socket, &exceptionDescriptors);
 		}
 		else {
 			if (FD_ISSET(client->socket, &readDescriptors)) {
-				LOG(INFO) << "Client " << client->GetID() << " has data!";
-				socketOkay = ReadData(client);
+				LOG(DEBUG) << "Client " << client->GetID() << " has data!";
+				socketStatus = ReadData(client);
 			}
 			/*if (FD_ISSET(client->socket, &writeDescriptors)) {
 
@@ -175,10 +181,10 @@ void ServerSocket::CheckClients() {
 		}
 
 
-		if (!socketOkay) {
-			LOG(ERROR) << "An error occurred while checking a client socket. Client " << client->GetID() << ": " << GetWSAErrorString();
-			TerminateClient(client);
-			//is it okay to modify mConnectedClients here??
+		if (socketStatus != SOCKET_OKAY) {
+			LOG(ERROR) << "Client " << client->GetID() << ": " << GetWSAErrorString();
+			client->socket = INVALID_SOCKET; //mark as invalid, will be erased by zero/check fds at start of loop
+			//TerminateClient((*client));
 		}
 	}
 }
@@ -196,7 +202,8 @@ void ServerSocket::TerminateClient(ClientPtr const &client) {
 		return;
 	LOG(INFO) << "Terminating Client " << client->GetID();
 
-	FD_CLR(client->socket, &readDescriptors);
+	//FD_CLR(client->socket, &readDescriptors);
+	//FD_CLR(client->socket, &
 
 	ClientList::iterator it = std::find(mConnectedClients.begin(), mConnectedClients.end(), client);
 	if (it != mConnectedClients.end())
@@ -210,7 +217,7 @@ void ServerSocket::AcceptNewClient(){
 	ClientPtr client(new Client);
 	u_long nonBlockingEnable = 1;
 
-
+	LOG(INFO) << "Client [" << client->GetID() << "] accepted";
 	SOCKET newConnection = accept(mListenSocket, (struct sockaddr*) & client->endpoint, &client->saddr_len);
 	if (newConnection == INVALID_SOCKET) {
 		LOG(ERROR) << "Failed to accept client connection";
@@ -231,6 +238,4 @@ void ServerSocket::AcceptNewClient(){
 	LOG(INFO) << "Connection accepted from " << inet4_ntop_str(&client->endpoint) << ":" << port;
 
 	mConnectedClients.push_back(std::move(client));
-
-	//TerminateClient(mConnectedClients.at(0));
 }

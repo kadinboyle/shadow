@@ -1,6 +1,7 @@
 #pragma once
 
 #define FALLBACK_PORT "7780"
+#define SOCKET_OKAY 0
 
 #include <WinSock2.h>
 #include <WS2tcpip.h>
@@ -38,7 +39,7 @@ class ServerSocket
 		void TerminateClient(ClientPtr const &client);
 		void CheckClients();
 		int Select();
-		bool ReadData(ClientPtr const &client);
+		int ReadData(ClientPtr const &client);
 
 };
 

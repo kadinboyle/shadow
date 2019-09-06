@@ -11,8 +11,8 @@
 
 std::string getTimeNow();
 
-static inline std::string GetWSAErrorString() {
-	DWORD errorMessageID = ::GetLastError();
+static inline std::string GetWSAErrorString(DWORD errorMessageID = WSAGetLastError()) {
+	//DWORD errorMessageID = WSAGetLastError();
 	if (errorMessageID == 0)
 		return std::string(); //No error message has been recorded
 

@@ -19,6 +19,7 @@ class Client {
 		const int GetID() const;
 		bool IsTerminated();
 		void TerminateConnection();
+		void ClearBuffers();
 
 
 

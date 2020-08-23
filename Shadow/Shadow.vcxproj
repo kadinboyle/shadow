@@ -93,11 +93,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;ELPP_WINSOCK2;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -156,20 +157,31 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Client.cpp" />
+    <ClCompile Include="ClientPacket.cpp" />
     <ClCompile Include="easylogging++.cc" />
     <ClCompile Include="Helpers.cpp" />
     <ClCompile Include="Module.cpp" />
     <ClCompile Include="ModuleLoader.cpp" />
     <ClCompile Include="ServerSocket.cpp" />
     <ClCompile Include="Shadow.cpp" />
+    <ClCompile Include="MDialog.cpp" />
+    <ClCompile Include="Utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CCBotCommands.h" />
     <ClInclude Include="Client.h" />
+    <ClInclude Include="ClientPacket.h" />
     <ClInclude Include="easylogging++.h" />
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="MDialog.h" />
     <ClInclude Include="Module.h" />
     <ClInclude Include="ModuleLoader.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="ServerSocket.h" />
+    <ClInclude Include="Utilities.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Shadow.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

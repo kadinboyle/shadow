@@ -5,6 +5,9 @@
 #include <iostream>
 
 #include "ServerSocket.h"
+#include "Utilities.h"
+#include <Windows.h>
+#include "MDialog.h"
 
 INITIALIZE_EASYLOGGINGPP
 
@@ -17,11 +20,15 @@ void configureLogger() {
 	el::Loggers::reconfigureLogger("default", defaultConf);
 }
 
-int main()
-{
+int main() {
 	configureLogger();
-	LOG(INFO) << "GIDDAY";
+	LOG(INFO) << "Initializing...";
 
+	//MessageBox(nullptr, TEXT("The driver is sleeping!!"), TEXT("Message"), MB_OK);
+	DoDebugDialog(nullptr, nullptr);
+	LOG(WARNING) << "GET BACK ";
+
+	//TODO: Make server periodically stop listening if no active tasks?
 	ServerSocket server;
 	server.Listen();
 	server.Stop();

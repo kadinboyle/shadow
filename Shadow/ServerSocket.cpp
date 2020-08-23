@@ -86,12 +86,14 @@ void ServerSocket::Listen(){
 			LOG(ERROR) << "select() error: " << GetWSAErrorString();
 			mDoListen = false;
 		}
+
+		//general IO
+		this->CheckClients();
 			
 		//check for new connections
 		this->CheckForConnections();
 
-		//general IO
-		this->CheckClients();
+
 
 
 	 }
@@ -135,11 +137,16 @@ int ServerSocket::Select(){
 int ServerSocket::ReadData(ClientPtr const &client) {
 	int err;
 
+	if (client->recvBufferUsed >= kClientBufferSize) {
+		LOG(ERROR) << "Receive buffer is full for Client " << client->GetID();
+		
+		return SOCKET_ERROR;
+	}
+
 	while (client->recvBufferUsed < kClientBufferSize) {
 		int bytesRead = recv(client->socket, client->recvBuffer + client->recvBufferUsed, kClientBufferSize - client->recvBufferUsed, 0);
 		
 		if (bytesRead == 0) {
-			LOG(INFO) << "Socket closed by client?";
 			return WSAECONNRESET; //is this case ever hit in nonblocking socket? Maybe remove
 		}
 		else if (bytesRead == SOCKET_ERROR) {
@@ -182,9 +189,17 @@ void ServerSocket::CheckClients() {
 
 
 		if (socketStatus != SOCKET_OKAY) {
-			LOG(ERROR) << "Client " << client->GetID() << ": " << GetWSAErrorString();
+			if (socketStatus == WSAECONNRESET)
+				LOG(ERROR) << "Client Terminated connection";
+			else
+				LOG(ERROR) << "Client " << client->GetID() << ": " << GetWSAErrorString();
 			client->socket = INVALID_SOCKET; //mark as invalid, will be erased by zero/check fds at start of loop
 			//TerminateClient((*client));
+		}
+		else {
+			//Check extract packet from buffer
+			client->CheckExtractPacket();
+			LOG(INFO) << "Done checking extract packet";
 		}
 	}
 }
